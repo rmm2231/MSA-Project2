@@ -205,6 +205,10 @@ app.put('/tenant', function (req, res) {
    //TODO: IMPLEMENT THIS 
 });
 
+app.delete('/tenant', function (req, res) {
+   //TODO: IMPLEMENT THIS 
+});
+
 ////======== HELPER API ========\\\\
 
 app.delete('/all', function (req, res) {
