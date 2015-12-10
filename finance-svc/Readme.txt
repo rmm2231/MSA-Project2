@@ -4,28 +4,26 @@ Before spinning up another student instance, you have to change the ports mappin
 	docker build -t student-svc .
 
 API:
-/student/add POST
-	When this API is called, a new user with the specified name will be created in the database. Returns a unique 6-digit ID after the add operation is successful.
+    GET /:
+        Returns an info string about the service
+    GET /finances:
+        Without query parameters it returns all the finances in the system. The two available
+        parameters are ssn and tid. TID requires that an SSN is passed as well and this will 
+        return one specific entry from the table. Passing only an SSN will return all
+        all the finance information for a person at each "University" it belongs to.
+    POST /finances:
+        Add a new finance entry. SSN and TID are required fields. Below are the fields and
+        descriptions:
+            ssn: {type: String, required: true},
+            firstName: String,
+            lastName: String,
+            balance: Number,
+            due: Date,
+            tid: {type: Number, required: true}
+    DELETE /finances:
+        SSN is a required query parameter and will delete all of that persons finance information.
+        TID is an optional parameter to delete a specific entry.
+    PUT /finances:
+        Use this to update a user's finance information
 
-	Must be followed by a JSON request body. In the body a valid firstname and lastname field must be specified.
-
-/student/info GET
-	This API return student info with the student ID.
-
-/student/delete DELETE
-	This API deletes one student with the given student ID.
-
-	The request body must contain a valid student ID and only one student ID, nothing else is reported as an error.
-
-/student/update POST
-	This API allows user to update any field of a student (except for student ID).
-
-	All fields must be included in the database’s schema. If not, return 400. Must provide a valid student ID.
-
-/student/addSchema POST
-	This API is called to add a new field to schema.
-
-	The request body must contain a schema name (schema) and its type (type). Type should be restricted to ‘string’, ’number’, ‘bool’.
-
-/student/getall GET
-	This API returns all student info. No parameter needed.
+        
