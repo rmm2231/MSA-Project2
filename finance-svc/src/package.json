@@ -1,0 +1,19 @@
+{
+  "name": "src",
+  "version": "1.0.0",
+  "description": "A finance microservice",
+  "main": "service.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Michael Moldoveanu rmm2231@columbia.edu",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.14.1",
+    "express": "^4.13.3",
+    "mongoose": "^4.1.11",
+    "mongoose-gen": "^2.1.0",
+    "util": "^0.10.3",
+    "xml2js": "^0.4.13"
+  }
+}
