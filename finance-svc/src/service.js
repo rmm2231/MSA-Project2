@@ -2,10 +2,6 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var app = express();
 var mongoose = require('mongoose');
-var mongoose_gen = require('mongoose-gen');
-var util = require('util');
-var fs = require('fs');
-var fileName = 'config.xml';
 
 var Finance = require('./models/finance.js');
 
