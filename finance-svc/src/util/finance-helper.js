@@ -237,10 +237,7 @@ var _update_finances = function (req, res) {
 }
 
 var _delete_finances = function (req, res) {
-    if (!req.query['tid'] || !req.query['ssn']) {
-        res.status(400).send("TID and SSN are required for delete");
-        return;
-    }
+
         Finance.remove({
                 ssn: req.query['ssn'],
                 tid: req.query['tid']

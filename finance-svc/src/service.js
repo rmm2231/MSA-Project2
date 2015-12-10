@@ -35,10 +35,27 @@ app.get('/', function (req, res) {
 
 ////======== FINANCE API ========\\\\
 
+var verify_tenant = function(tid) {
+    var exists = false;
+    
+    Tenant.count({tid:tid}).exec()
+    .then(function(count) {
+        if (count > 0)
+            exists = true;
+    });
+    
+    return exists;
+}
+
 /* Add a new entry to the finances table */
 app.post('/finances', function (req, res) {
     if (req.body == null) {
         res.status(400).send('Request body is empty!');
+        return;
+    }
+    
+    if (!verify_tenant) {
+        res.status(400).send('Tenant not found');
         return;
     }
 
@@ -47,6 +64,12 @@ app.post('/finances', function (req, res) {
 
 /* Gets all of the finances */
 app.get('/finances', function (req, res) {
+    
+    if (req.query['tid'] != null && !verify_tenant) {
+        res.status(400).send('Tenant not found');
+        return;
+    }
+    
     FinanceHelper.get_finances(req, res);
 });
 
@@ -54,6 +77,11 @@ app.get('/finances', function (req, res) {
 app.put('/finances', function (req, res) {
     if (req.body.ssn == null || req.body.tid == null) {
         res.status(400).send("SSN and TID required")
+    }
+    
+    if (!verify_tenant) {
+        res.status(400).send('Tenant not found');
+        return;
     }
 
     FinanceHelper.update_finances(req, res);
@@ -66,8 +94,13 @@ app.delete('/finances', function (req, res) {
         return;
     }
 
-    if (req.query['ssn'] == null) {
-        res.status(400).send('SSN required');
+    if (req.query['ssn'] == null || req.query['tid'] == null) {
+        res.status(400).send('SSN and TID required');
+        return;
+    }
+    
+    if (!verify_tenant) {
+        res.status(400).send('Tenant not found');
         return;
     }
 
