@@ -104,13 +104,44 @@ var _save_extra_attr = function (attr) {
     });
 }
 
-var _update_or_insert_attr = function (attr) {
 
-    return ExtraAttr.findOne({ssn:attr.ssn, tid:attr.tid, attrName:attr.attrName}, function(err, old) {
+var _update_or_insert_attr = function(entry, schemaChange) {
+   return ExtraAttr.findOne({ssn:entry.ssn, tid:entry.tid, attrName:schemaChange.columnName}, function(err, old) {
         if (err)
             throw new Error(err);
-        ExtraAttr.update({ssn:attr.ssn, tid:attr.tid, attrName:attr.attrName}, attr, {upsert: true}).exec();
-        return {old: old, attrName: attr.attrName};
+        extraAttr = {};
+        columnName = schemaChange.columnName;
+
+        if (schemaChange.required && !entry.hasOwnProperty(columnName) && old == null) {
+            return {old:old, attrName:columnName, err: {error_msg:"Field: " + columnName + " is required.", error_code:400} };
+        }
+
+        extraAttr.attrName = columnName;
+        extraAttr.ssn = entry.ssn;
+        extraAttr.tid = entry.tid;
+
+        switch (schemaChange.columnType) {
+        case "Number":
+            var val = Number(entry[columnName] ? entry[columnName] : old.attrValue);
+            if (isNaN(val)) {
+                return {old:old, attrName:columnName, err: {error_msg:"Field: " + columnName + " must be a valid number", error_code:400} };
+            }
+            extraAttr.attrValue = val;
+            break;
+        case "String":
+            extraAttr.attrValue = entry[columnName] ? entry[columnName] : old.attrValue;
+            break;
+        case "Date":
+            var val = Date.parse(entry[columnName] ? entry[columnName] : old.attrValue);
+            if (isNaN(val)) {
+                return {old:old, attrName:columnName, err: {error_msg:"Field: " + columnName + " must be a valid date", error_code:400} };
+            }
+            extraAttr.attrValue = val;
+            break;
+        }
+       
+        ExtraAttr.update({ssn:extraAttr.ssn, tid:extraAttr.tid, attrName:columnName}, extraAttr, {upsert: true}).exec();
+        return {old: old, attrName:columnName, err:null};
     });
 }
 
@@ -236,8 +267,7 @@ var post_finances = function (entry) {
     });
 }
 
-var put_finances = function (entry) {
-    
+var put_finances = function(entry) {
     return _get_one_finance(entry.ssn, entry.tid).then(function(finance) {
         var old = finance.toObject();
         delete old._id;
@@ -246,64 +276,21 @@ var put_finances = function (entry) {
         
         return SchemaHelper.get_changes(entry.tid).then(function (changes) {
             var save_promises = new Array();
-            var old_finance = old;
-            var extraAttr;
-            var columnName;
-            var error = false;
-            var error_msg = "";
-            var error_code = 0;
+            
             console.log("got changes " + changes.length);
             
             for (var i = 0; i < changes.length; i++) {
-                console.log("doing stuff with changes");
-                extraAttr = {};
-                columnName = changes[i].columnName;
-
-                if (changes[i].required && !entry.hasOwnProperty(columnName)) {
-                    error = true;
-                    error_msg = "Field: " + columnName + " is required.";
-                    error_code = 400;
-                    break;
-                }
-
-                extraAttr.attrName = columnName;
-                extraAttr.ssn = entry.ssn;
-                extraAttr.tid = entry.tid;
-
-                switch (changes[i].columnType) {
-                case "Number":
-                    var val = Number(entry[columnName]);
-                    if (isNaN(val)) {
-                        error = true;
-                        error_msg = "Field: " + columnName + " must be a valid number";
-                        error_code = 400;
-                        break;
-                    }
-                    extraAttr.attrValue = val;
-                    break;
-                case "String":
-                    extraAttr.attrValue = entry[columnName];
-                    break;
-                case "Date":
-                    var val = Date.parse(entry[columnName]);
-                    if (isNaN(val)) {
-                        error = true;
-                        error_msg = "Field: " + columnName + " must be a valid date";
-                        error_code = 400;
-                        break;
-                    }
-                    extraAttr.attrValue = val;
-                    break;
-                }
-                if (error)
-                    break;
                 console.log("pushing to array");
-                save_promises.push(_update_or_insert_attr(extraAttr));
+                save_promises.push(_update_or_insert_attr(entry, changes[i]));
             }
+            
             console.log("made it out of the loop");
+            
             return Promise.all(save_promises.map(_reflect)).then(function (results) {
                 console.log("finished saving -- checking error");
-                if (error) {
+                var error = results.filter(function(x) {return x.err != null;});
+                
+                if (error.length != 0) {
                     for (var i = 0; i < results.length; i++) {
                         if (results[i].old != null)
                             ExtraAttr.findOneAndUpdate({ssn:results[i].old.ssn, tid:results[i].old.tid}, results[i].old, {}).exec();
@@ -311,7 +298,7 @@ var put_finances = function (entry) {
                             ExtraAttr.remove({ssn:entry.ssn, tid:entry.tid, attrName:results[i].attrName}).exec();
                     }
                     Finance.findOneAndUpdate({ssn:old.ssn, tid:old.tid}, old, {}).exec();
-                    return errorResponse(error_msg, error_code);
+                    return errorResponse(error[0].err.error_msg, error[0].err.error_code);
                 }
                 return successResponse("Saved entry for SSN: " + entry.ssn + " TID: " + entry.tid);
             }, function (err) {
@@ -329,7 +316,7 @@ var put_finances = function (entry) {
     }, function (err) {
         return errorResponse(err, 500); 
     });
-};
+}
 
 var delete_finances = function(ssn, tid) {
     var query_opts = {ssn: ssn, tid: tid};

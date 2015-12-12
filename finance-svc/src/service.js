@@ -7,6 +7,7 @@ var mongoose = require('mongoose');
 var FinanceHelper = require('./util/finance-helper.js');
 var TenantHelper = require('./util/tenant-helper.js');
 var SchemaHelper = require('./util/schema-helper.js');
+var SQSHelper = require('./util/sqs-helper.js');
 
 // Models
 var Finance = require('./models/finance.js');
