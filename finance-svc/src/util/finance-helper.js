@@ -3,44 +3,65 @@ var SchemaChanges = require('../models/schema-changes.js');
 var ExtraAttr = require('../models/extra-attributes.js');
 
 var HelperResponse = require('../models/response.js');
+var SchemaHelper = require('./schema-helper.js');
+
+//==== HELPERS ====\\
 
 function _reflect(promise) {
-    return promise.then(function(data) {return data;},
-                        function(err) {throw new Error(err);});
+    return promise.then(function (data) {
+            return data;
+        },
+        function (err) {
+            throw new Error(err);
+        });
 }
 
-//==== GET FUNCTION HELPERS ====\\
-var _get_finances_2 = function(ssn, tid) {
-    if (!tid && !ssn) {
-       return Finance.find({}, function(err, finances) {
-            if (err)
-                throw new Error(err);
-            return finances;
-        });
-    } else if (!tid) {
-        return Finance.find({ssn:ssn}, function(err, finances) {
-            if (err)
-                throw new Error(err);
-            return finances;
-        });
-    } else{
-        return Finance.find({ssn:ssn, tid:tid}, function(err, finances) {
-            if (err)
-                throw new Error(err);
-            return finances;
-        });
-    }
+function successResponse(data) {
+    return new HelperResponse(null, 200, data);
+}
+
+function errorResponse(err, code) {
+    return new HelperResponse(err, code, null);
+}
+
+var _get_finances = function (ssn, tid) {
+    var query_opts = !ssn && !tid ? {} : !tid ? {
+        ssn: ssn
+    } : {
+        ssn: ssn,
+        tid: tid
+    };
+
+    return Finance.find(query_opts, function (err, finances) {
+        if (err)
+            throw new Error(err);
+        return finances;
+    });
+}
+
+var _get_one_finance = function (ssn, tid) {
+    return Finance.findOne({
+        ssn: ssn,
+        tid: tid
+    }, function (err, finance) {
+        if (err)
+            throw new Error(err);
+        return finance;
+    });
 }
 
 var _get_extra_info = function (finance) {
-    return ExtraAttr.find({ssn:finance.ssn, tid:finance.tid}, function(err, attrs){
+    return ExtraAttr.find({
+        ssn: finance.ssn,
+        tid: finance.tid
+    }, function (err, attrs) {
         if (err)
             throw new Error(err);
         return attrs;
     });
 }
 
-var _get_extra_attr = function(ssn, tid, columnName) {
+var _get_extra_attr = function (ssn, tid, columnName) {
     return ExtraAttr.findOne({
         ssn: ssn,
         tid: tid,
@@ -52,261 +73,287 @@ var _get_extra_attr = function(ssn, tid, columnName) {
     });
 }
 
-var _get_full_finance_info = function(ssn, tid) {
-    var finances_promise = _get_finances_2(ssn,tid);
+var _count_finances = function (ssn, tid) {
+    return Finance.count({
+        ssn: ssn,
+        tid: tid
+    }, function (err, count) {
+        if (err)
+            throw new Error(err);
+        return count;
+    });
+}
+
+var _save_finance = function (entry) {
+    var finance = new Finance(entry);
+
+    return finance.save(function (err, saved) {
+        if (err)
+            throw new Error(err);
+        return saved;
+    });
+}
+
+var _save_extra_attr = function (attr) {
+    var extra_attr = new ExtraAttr(attr);
+
+    return extra_attr.save(function (err, saved) {
+        if (err)
+            throw new Error(err);
+        return saved;
+    });
+}
+
+var _update_or_insert_attr = function (attr) {
+
+    return ExtraAttr.findOne({ssn:attr.ssn, tid:attr.tid, attrName:attr.attrName}, function(err, old) {
+        if (err)
+            throw new Error(err);
+        ExtraAttr.update({ssn:attr.ssn, tid:attr.tid, attrName:attr.attrName}, attr, {upsert: true}).exec();
+        return {old: old, attrName: attr.attrName};
+    });
+}
+
+var _roll_back_post = function (ssn, tid) {
+    Finance.remove({
+        ssn: ssn,
+        tid: tid
+    }).exec();
+    ExtraAttr.remove({
+        ssn: ssn,
+        tid: tid
+    }).exec();
+}
+
+//==== CRUD HELPERS ====\\
+
+var get_full_finance_info = function (ssn, tid) {
+    var finances_promise = _get_finances(ssn, tid);
     var financesArr;
     var promises = new Array();
     var combinedArr = new Array();
-    
-    return finances_promise.then(function(finances) {
+
+    return finances_promise.then(function (finances) {
         financesArr = finances;
-        
-        for(var i = 0; i < finances.length; i++) {
+
+        for (var i = 0; i < finances.length; i++) {
             promises.push(_get_extra_info(finances[i]));
         }
-    }).then(function() {
-        return Promise.all(promises.map(_reflect)).then(function(results){
+    }).then(function () {
+        return Promise.all(promises.map(_reflect)).then(function (results) {
             results = [].concat.apply([], results);
-            
-            for(var i = 0; i < financesArr.length; i++) {
-                var to_add = financesArr[i];
-                var extraAttrs = results.filter(function(x) { return x.tid == to_add.tid && x.ssn == to_add.ssn});
-                
+
+            for (var i = 0; i < financesArr.length; i++) {
+                var to_add = financesArr[i].toObject();
+                var extraAttrs = results.filter(function (x) {
+                    return x.tid == to_add.tid && x.ssn == to_add.ssn
+                });
+
                 for (var j = 0; j < extraAttrs.length; j++) {
-                    to_add._doc[extraAttrs[j].attrName] = extraAttrs[j].attrValue;
+                    to_add[extraAttrs[j].attrName] = extraAttrs[j].attrValue;
                 }
-                
+
                 combinedArr.push(to_add);
             }
 
             return new HelperResponse(null, 200, combinedArr);
-        }, function(err){
-            return new HelperResponse(err, 500, null);   
+        }, function (err) {
+            return new HelperResponse(err, 500, null);
         });
     });
 }
 
-//==== POST/ADD FUNCTION HELPERS ====\\
+var post_finances = function (entry) {
+    var exists_promise = _count_finances(entry.ssn, entry.tid);
 
-var _add_entry = function (req, res) {
-
-    Finance.count({
-        ssn: req.body.ssn,
-        tid: req.body.tid
-    }, function (err, count) {
-        if (err)
-            res.status(500).send(err);
-        else if (count > 0)
-            res.status(409).send("Entry already exists");
-        else {
-            // Add the base data
-            var finance = new Finance();
-            var error = null;
-
-            finance.ssn = req.body.ssn;
-            finance.firstName = req.body.firstName;
-            finance.lastName = req.body.lastName;
-            finance.balance = req.body.balance ? req.body.balance : 0;
-            finance.due = req.body.due ? Date.parse(req.body.due) : new Date();
-            finance.tid = req.body.tid;
-
-            finance.save(function (err) {
-                if (err) {
-                    res.status(500).send(err);
-                } else {
-                    var promise = SchemaChanges.find({
-                        tid: req.body.tid
-                    }).exec();
-                    promise.then(function (changes) {
-                            //Get all the schema changes for this tid
-                            var extraAttr = new ExtraAttr();
-                            extraAttr.ssn = finance.ssn;
-                            extraAttr.tid = finance.tid;
-
-                            for (i = 0; i < changes.length; i++) {
-                                var columnName = changes[i].columnName;
-
-                                if (changes[i].required && !req.body.hasOwnProperty(columnName)) {
-                                    throw new Error("Field: " + columnName + " is required.");
-                                }
-                                extraAttr.attrName = columnName;
-
-                                switch (changes[i].columnType) {
-                                case "Number":
-                                    var val = Number(req.body[columnName]);
-                                    if (isNaN(val))
-                                        throw new Error("Field: " + columnName + " must be a valid number");
-                                    extraAttr.attrValue = val;
-                                    break;
-                                case "String":
-                                    extraAttr.attrValue = req.body[columnName];
-                                    break;
-                                case "Date":
-                                    var val = Date.parse(req.body[columnName]);
-                                    if (isNaN(val))
-                                        throw new Error("Field: " + columnName + " must be a valid date");
-                                    extraAttr.attrValue = val;
-                                    break;
-                                }
-
-                                extraAttr.save(function (err) {
-                                    if (err)
-                                        throw new Error(err);
-                                });
-                            }
-
-                            res.status(200).send('Finance added for SSN: ' + finance.ssn + " TID: " + finance.tid);
-                        }, function (err) {
-                            res.status(500).send(error);
-                            return;
-                        })
-                        .then(null, function (err) {
-                            // on error rollback
-                            ExtraAttr.remove({
-                                ssn: finance.ssn,
-                                tid: finance.tid
-                            }).exec();
-                            Finance.remove({
-                                ssn: finance.ssn,
-                                tid: finance.tid
-                            }).exec();
-                            res.status(500).send("Failed to save this user's information (" + err + ")");
-                        });
-                }
-            });
+    return exists_promise.then(function (count) {
+        if (count > 0) {
+            return new HelperResponse("Entry already exists", 409, null);
         }
+        return _save_finance(entry).then(function (saved) {
+            //Get all the additional columns for this tenant
+            return SchemaHelper.get_changes(saved.tid).then(function (changes) {
+                //for each change, create and save the extra info that exists (or return if required)
+                var save_promises = new Array();
+                var extraAttr;
+                var columnName;
+
+                for (var i = 0; i < changes.length; i++) {
+                    extraAttr = new ExtraAttr();
+                    columnName = changes[i].columnName;
+
+                    if (changes[i].required && !entry.hasOwnProperty(columnName)) {
+                        _roll_back_post(entry.ssn, entry.tid);
+                        return new HelperResponse("Field: " + columnName + " is required.", 400, null);
+                    }
+                    extraAttr.attrName = columnName;
+                    extraAttr.ssn = entry.ssn;
+                    extraAttr.tid = entry.tid;
+
+                    switch (changes[i].columnType) {
+                    case "Number":
+                        var val = Number(entry[columnName]);
+                        if (isNaN(val)) {
+                            _roll_back_post(entry.ssn, entry.tid);
+                            return new HelperResponse("Field: " + columnName + " must be a valid number", 400, null);
+                        }
+                        extraAttr.attrValue = val;
+                        break;
+                    case "String":
+                        extraAttr.attrValue = entry[columnName];
+                        break;
+                    case "Date":
+                        var val = Date.parse(entry[columnName]);
+                        if (isNaN(val)) {
+                            _roll_back_post(entry.ssn, entry.tid);
+                            return new HelperResponse("Field: " + columnName + " must be a valid date", 400, null);
+                        }
+                        extraAttr.attrValue = val;
+                        break;
+                    }
+
+                    save_promises.push(_save_extra_attr(extraAttr));
+                }
+
+                return Promise.all(save_promises.map(_reflect)).then(function (results) {
+                    return new HelperResponse(null, 200, "Saved entry for SSN: " + entry.ssn + " TID: " + entry.tid);
+                }, function (err) {
+                    _roll_back_post(entry.ssn, entry.tid);
+                    return new HelperResponse(err, 500, null);
+                });
+
+            }, function (err) {
+                _roll_back_post(entry.ssn, entry.tid);
+                return new HelperResponse(err, 500, null);
+            });
+        }, function (err) {
+            _roll_back_post(entry.ssn, entry.tid);
+            return new HelperResponse(err, 500, null);
+        });
+    }, function (err) {
+        _roll_back_post(entry.ssn, entry.tid);
+        return new HelperResponse(err, 500, null);
     });
 }
 
-var _update_finances = function (req, res) {
-    Finance.findOne({
-            ssn: req.body.ssn,
-            tid: req.body.tid
-        },
-        function (err, finance) {
-            if (err) {
-                res.status(500).send(err);
-                return;
-            }
+var put_finances = function (entry) {
+    
+    return _get_one_finance(entry.ssn, entry.tid).then(function(finance) {
+        var old = finance.toObject();
+        delete old._id;
+        console.log("updating finance");
+        Finance.update({ssn:entry.ssn, tid:entry.tid}, entry, {}).exec();
+        
+        return SchemaHelper.get_changes(entry.tid).then(function (changes) {
+            var save_promises = new Array();
+            var old_finance = old;
+            var extraAttr;
+            var columnName;
+            var error = false;
+            var error_msg = "";
+            var error_code = 0;
+            console.log("got changes " + changes.length);
+            
+            for (var i = 0; i < changes.length; i++) {
+                console.log("doing stuff with changes");
+                extraAttr = {};
+                columnName = changes[i].columnName;
 
-            finance.firstName = req.body.firstName ? req.body.firstName : finance.firstName;
-
-            finance.lastName = req.body.lastName ? req.body.lastName : finance.lastName;
-
-            finance.balance = req.body.balance ? req.body.balance : finance.balance;
-
-            finance.due = req.body.due ? req.body.due : finance.due;
-            finance.save(function (err) {
-                if (err) {
-                    res.status(500).send("Error updating user");
-                    return;
-                } else {
-                    var promise = SchemaChanges.find({
-                        tid: req.body.tid
-                    }).exec();
-
-                    promise.then(function (changes) {
-                            for (var i = 0; i < changes; i++) {
-                                ExtraAttr.findOne({
-                                    ssn: finance.ssn,
-                                    tid: finance.tid,
-                                    attrName: changes[i].columnName
-                                }, function (err, attr) {
-                                    if (err)
-                                        throw new Error(err);
-                                    if (attr == null) {
-                                        var addAttr = new ExtraAttr();
-                                        switch (changes[i].columnType) {
-                                        case "String":
-                                            addAttr.attrValue = req.body[attrName];
-                                            break;
-                                        case "Number":
-                                            var value = Number(req.body[attrName]);
-                                            if (value == NaN)
-                                                throw new Error("Field " + req.body[attrName] + " must be a Number");
-                                            addAttr.attrValue = value;
-                                            break;
-                                        case "Date":
-                                            var value = Date(req.body[attrName]);
-                                            if (value == NaN)
-                                                throw new Error("Field " + req.body[attrName] + " must be a Date");
-                                            addAttr.attrValue = value;
-                                            break;
-                                        }
-
-                                        addAttr.save(function (err) {
-                                            if (err)
-                                                throw new Error(err);
-                                        });
-                                    } else if (attr.attrValue != req.body[attr.attrName] && req.body[attr.attrName] != null) {
-                                        switch (changes[i].columnType) {
-                                        case "String":
-                                            attr.attrValue = req.body[attrName];
-                                            break;
-                                        case "Number":
-                                            var value = Number(req.body[attrName]);
-                                            if (value == NaN)
-                                                throw new Error("Field " + req.body[attrName] + " must be a Number");
-                                            attr.attrValue = value;
-                                            break;
-                                        case "Date":
-                                            var value = Date(req.body[attrName]);
-                                            if (value == NaN)
-                                                throw new Error("Field " + req.body[attrName] + " must be a Date");
-                                            attr.attrValue = value;
-                                            break;
-                                        }
-                                        attr.save(function (err) {
-                                            if (err)
-                                                throw new Error(err);
-                                        });
-                                    }
-                                });
-                            }
-
-                            res.status(200).send("Successfully updated information for user SSN: " + req.body.ssn + " TID: " + req.body.tid);
-
-                        })
-                        .then(null, function (err) {
-                            res.status(500).send(err);
-                        });
-
+                if (changes[i].required && !entry.hasOwnProperty(columnName)) {
+                    error = true;
+                    error_msg = "Field: " + columnName + " is required.";
+                    error_code = 400;
+                    break;
                 }
-            });
-        }
-    );
-}
 
-var _delete_finances = function (req, res) {
+                extraAttr.attrName = columnName;
+                extraAttr.ssn = entry.ssn;
+                extraAttr.tid = entry.tid;
 
-        Finance.remove({
-                ssn: req.query['ssn'],
-                tid: req.query['tid']
+                switch (changes[i].columnType) {
+                case "Number":
+                    var val = Number(entry[columnName]);
+                    if (isNaN(val)) {
+                        error = true;
+                        error_msg = "Field: " + columnName + " must be a valid number";
+                        error_code = 400;
+                        break;
+                    }
+                    extraAttr.attrValue = val;
+                    break;
+                case "String":
+                    extraAttr.attrValue = entry[columnName];
+                    break;
+                case "Date":
+                    var val = Date.parse(entry[columnName]);
+                    if (isNaN(val)) {
+                        error = true;
+                        error_msg = "Field: " + columnName + " must be a valid date";
+                        error_code = 400;
+                        break;
+                    }
+                    extraAttr.attrValue = val;
+                    break;
+                }
+                if (error)
+                    break;
+                console.log("pushing to array");
+                save_promises.push(_update_or_insert_attr(extraAttr));
+            }
+            console.log("made it out of the loop");
+            return Promise.all(save_promises.map(_reflect)).then(function (results) {
+                console.log("finished saving -- checking error");
+                if (error) {
+                    for (var i = 0; i < results.length; i++) {
+                        if (results[i].old != null)
+                            ExtraAttr.findOneAndUpdate({ssn:results[i].old.ssn, tid:results[i].old.tid}, results[i].old, {}).exec();
+                        else 
+                            ExtraAttr.remove({ssn:entry.ssn, tid:entry.tid, attrName:results[i].attrName}).exec();
+                    }
+                    Finance.findOneAndUpdate({ssn:old.ssn, tid:old.tid}, old, {}).exec();
+                    return errorResponse(error_msg, error_code);
+                }
+                return successResponse("Saved entry for SSN: " + entry.ssn + " TID: " + entry.tid);
             }, function (err) {
-                if (err)
-                    throw new Error(err);
-            })
-            .then(function (finance) {
-                return ExtraAttr.remove({
-                    ssn: req.query['ssn'],
-                    tid: req.query['tid']
-                }, function (err) {
-                    if (err)
-                        throw new Error(err);
-                });
-            }, function (err) {
-                res.status(500).send("Failed to delete for SSN: " + req.query['ssn'] + " TID: " + req.query['tid'] + "(" + err + ")");
-            })
-            .then(function (obj) {
-                res.status(200).send("Deleted finances for SSN: " + req.query['ssn'] + " TID: " + req.query['tid']);
-            }, function (err) {
-                res.status(500).send("Failed to delete for SSN: " + req.query['ssn'] + " TID: " + req.query['tid'] + "(" + err + ")");
+                return errorResponse(err, 500);
             });
+
+        }, function (err) {
+            Finance.findOneAndUpdate({
+                ssn: entry.ssn,
+                tid: entry.tid
+            }, old, {}).exec();
+            return errorResponse(err, 500);
+        });
+        
+    }, function (err) {
+        return errorResponse(err, 500); 
+    });
+};
+
+var delete_finances = function(ssn, tid) {
+    var query_opts = {ssn: ssn, tid: tid};
+    
+    return Finance.remove(query_opts, function(err) {
+       if (err)
+           throw new Error(err);
+    }).then(function(){
+        return ExtraAttr.remove(query_opts, function(err){
+            if (err)
+                throw new Error(err);
+        }).then(function() {
+            return successResponse("Deleted finance data for SSN: " + ssn + " TID: " + tid);
+        }, function(err){
+            return errorResponse(err, 500)
+        })
+    }, function(err) {
+        return errorResponse(err, 500);  
+    });
 }
 
 module.exports = {
-    add_entry: _add_entry,
-    get_finances: _get_full_finance_info,
-    update_finances: _update_finances,
-    delete_finances: _delete_finances
+    post_finances: post_finances,
+    get_finances: get_full_finance_info,
+    put_finances: put_finances,
+    delete_finances: delete_finances
 }

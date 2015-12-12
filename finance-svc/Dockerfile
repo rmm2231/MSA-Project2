@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y \
 	build-essential \
 	nodejs \
 	npm	
-COPY ./src /finance-svc/
+COPY ./src/ /finance-svc/
 
 RUN cd finance-svc && npm update && npm install
 RUN mkdir -p /opt/app && cp -a /finance-svc/node_modules /opt/app/
@@ -22,4 +22,4 @@ EXPOSE 5672
 EXPOSE 15672
 EXPOSE 27017
 
-CMD ["nodejs", "/opt/app/src/service.js"]
+CMD ["nodejs", "/finance-svc/service.js"]

@@ -2,7 +2,11 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var app = express();
 var mongoose = require('mongoose');
+
+// Util Helpers
 var FinanceHelper = require('./util/finance-helper.js');
+var TenantHelper = require('./util/tenant-helper.js');
+var SchemaHelper = require('./util/schema-helper.js');
 
 // Models
 var Finance = require('./models/finance.js');
@@ -33,47 +37,40 @@ app.get('/', function (req, res) {
     res.send('This is Finance service');
 });
 
-////======== FINANCE API ========\\\\
-
-var verify_tenant = function(tid) {
-    var exists = false;
-    
-    Tenant.count({tid:tid}).exec()
-    .then(function(count) {
-        if (count > 0)
-            exists = true;
+var process_promise = function(promise, res){
+    promise.then(function(val) {
+        res.status(val.status).send(val.data ? val.data : val.error);
     });
-    
-    return exists;
 }
 
+var verify_tenant = function(tid) {
+    return TenantHelper.get_tenant(tid).then(function(tenant){
+        return tenant.data.length != 0;
+    });
+}
+
+////======== FINANCE API ========\\\\
 /* Add a new entry to the finances table */
 app.post('/finances', function (req, res) {
+    
     if (req.body == null) {
         res.status(400).send('Request body is empty!');
         return;
     }
     
-    if (!verify_tenant) {
-        res.status(400).send('Tenant not found');
-        return;
-    }
-
-    FinanceHelper.add_entry(req, res);
+    verify_tenant(req.body.tid).then(function(exists){
+        if (exists)
+            process_promise(FinanceHelper.post_finances(req.body), res);
+        else
+            res.status(400).send("Tenant does not exist");
+    });
+    
 });
 
 /* Gets all of the finances */
 app.get('/finances', function (req, res) {
-    
-    if (req.query['tid'] != null && !verify_tenant) {
-        res.status(400).send('Tenant not found');
-        return;
-    }
-    
-    var prom = FinanceHelper.get_finances(req.query['ssn'], req.query['tid']);
-    prom.then(function(val) {
-        res.status(val.status).send(val.data ? val.data : val.error);
-    });
+
+    process_promise(FinanceHelper.get_finances(req.query['ssn'], req.query['tid']), res);
     
 });
 
@@ -83,12 +80,12 @@ app.put('/finances', function (req, res) {
         res.status(400).send("SSN and TID required")
     }
     
-    if (!verify_tenant) {
-        res.status(400).send('Tenant not found');
-        return;
-    }
-
-    FinanceHelper.update_finances(req, res);
+    verify_tenant(req.body.tid).then(function(exists){
+        if (exists)
+            process_promise(FinanceHelper.put_finances(req.body), res);
+        else
+            res.status(400).send("Tenant does not exist");
+    });
 });
 
 /* Delete a user from the finance table */
@@ -102,115 +99,42 @@ app.delete('/finances', function (req, res) {
         res.status(400).send('SSN and TID required');
         return;
     }
-    
-    if (!verify_tenant) {
-        res.status(400).send('Tenant not found');
-        return;
-    }
 
-    FinanceHelper.delete_finances(req, res);
+    process_promise(FinanceHelper.delete_finances(req.query['ssn'], req.query['tid']), res);
 });
 
 ////======== SCHEMA API ========\\\\
 
 /* Post a new change to the schema */
 app.post('/schema', function (req, res) {
-    SchemaChanges.count({
-            tid: req.body.tid,
-            columnName: req.body.columnName,
-            columnType: req.body.columnType
-        })
-        .exec(function (err, count) {
-            var schemaChange = new SchemaChanges();
-
-            if (count > 0) {
-                res.status(409).send("Entry already exists for TID: " + req.body.tid);
-                return;
-            }
-
-            schemaChange.tid = req.body.tid;
-            schemaChange.columnName = req.body.columnName;
-            schemaChange.columnType = req.body.columnType;
-            schemaChange.required = req.body.required;
-
-            schemaChange.save(function (err) {
-                if (err) {
-                    res.status(400).send(err);
-                    return;
-                }
-
-                res.status(200).send("Successfully added column for TID: " + req.body.tid);
-            });
-        });
+    verify_tenant(req.body.tid).then(function(exists){
+        if (exists)
+            process_promise(SchemaHelper.web_post(req.body), res);
+        else
+            res.status(400).send("Tenant does not exist");
+    });
 });
 
 app.get('/schema', function (req, res) {
-    SchemaChanges.find({}, function (err, changes) {
-        if (err) {
-            res.status(500).send(err);
-            return;
-        }
-        res.status(200).send(changes);
-    });
+    process_promise(SchemaHelper.web_get(req.query['tid']), res);
 });
 
 ////======== TENANT API ========\\\\
 
 app.post('/tenant', function (req, res) {
-    Tenant.count({
-            tid: req.body.tid
-        })
-        .exec(function (err, count) {
-            var tenant = new Tenant();
-
-            if (count > 0) {
-                res.status(409).send("Entry already exists for TID: " + req.body.tid);
-                return;
-            }
-
-            tenant.tid = req.body.tid;
-            tenant.tName = req.body.tName;
-
-            tenant.save(function (err) {
-                if (err) {
-                    res.status(400).send(err);
-                    return;
-                }
-
-                res.status(200).send("Successfully added tenant: " + req.body.tName + " TID: " + req.body.tid);
-            });
-        });
-
+    process_promise(TenantHelper.post_tenant(req.body), res);
 });
 
 app.get('/tenant', function (req, res) {
-    if (req.query['tid']) {
-        Tenant.find({
-            tid: req.query['tid']
-        }, function (err, tenants) {
-            if (err) {
-                res.status(500).send(err);
-                return;
-            }
-            res.status(200).send(tenants);
-        });
-    } else {
-        Tenant.find({}, function (err, tenants) {
-            if (err) {
-                res.status(500).send(err);
-                return;
-            }
-            res.status(200).send(tenants);
-        });
-    }
+   process_promise(TenantHelper.get_tenant(req.body.tid), res);
 });
 
 app.put('/tenant', function (req, res) {
-   //TODO: IMPLEMENT THIS 
+   process_promise(TenantHelper.put_tenant(req.body), res);
 });
 
 app.delete('/tenant', function (req, res) {
-   //TODO: IMPLEMENT THIS 
+   process_promise(TenantHelper.delete_tenant(req.body.tid), res);
 });
 
 ////======== HELPER API ========\\\\
