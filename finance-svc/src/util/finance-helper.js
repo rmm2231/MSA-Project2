@@ -2,6 +2,92 @@ var Finance = require('../models/finance.js');
 var SchemaChanges = require('../models/schema-changes.js');
 var ExtraAttr = require('../models/extra-attributes.js');
 
+var HelperResponse = require('../models/response.js');
+
+function _reflect(promise) {
+    return promise.then(function(data) {return data;},
+                        function(err) {throw new Error(err);});
+}
+
+//==== GET FUNCTION HELPERS ====\\
+var _get_finances_2 = function(ssn, tid) {
+    if (!tid && !ssn) {
+       return Finance.find({}, function(err, finances) {
+            if (err)
+                throw new Error(err);
+            return finances;
+        });
+    } else if (!tid) {
+        return Finance.find({ssn:ssn}, function(err, finances) {
+            if (err)
+                throw new Error(err);
+            return finances;
+        });
+    } else{
+        return Finance.find({ssn:ssn, tid:tid}, function(err, finances) {
+            if (err)
+                throw new Error(err);
+            return finances;
+        });
+    }
+}
+
+var _get_extra_info = function (finance) {
+    return ExtraAttr.find({ssn:finance.ssn, tid:finance.tid}, function(err, attrs){
+        if (err)
+            throw new Error(err);
+        return attrs;
+    });
+}
+
+var _get_extra_attr = function(ssn, tid, columnName) {
+    return ExtraAttr.findOne({
+        ssn: ssn,
+        tid: tid,
+        attrName: columnName
+    }, function (err, attr) {
+        if (err)
+            throw new Error(err);
+        return attr;
+    });
+}
+
+var _get_full_finance_info = function(ssn, tid) {
+    var finances_promise = _get_finances_2(ssn,tid);
+    var financesArr;
+    var promises = new Array();
+    var combinedArr = new Array();
+    
+    return finances_promise.then(function(finances) {
+        financesArr = finances;
+        
+        for(var i = 0; i < finances.length; i++) {
+            promises.push(_get_extra_info(finances[i]));
+        }
+    }).then(function() {
+        return Promise.all(promises.map(_reflect)).then(function(results){
+            results = [].concat.apply([], results);
+            
+            for(var i = 0; i < financesArr.length; i++) {
+                var to_add = financesArr[i];
+                var extraAttrs = results.filter(function(x) { return x.tid == to_add.tid && x.ssn == to_add.ssn});
+                
+                for (var j = 0; j < extraAttrs.length; j++) {
+                    to_add._doc[extraAttrs[j].attrName] = extraAttrs[j].attrValue;
+                }
+                
+                combinedArr.push(to_add);
+            }
+
+            return new HelperResponse(null, 200, combinedArr);
+        }, function(err){
+            return new HelperResponse(err, 500, null);   
+        });
+    });
+}
+
+//==== POST/ADD FUNCTION HELPERS ====\\
+
 var _add_entry = function (req, res) {
 
     Finance.count({
@@ -48,7 +134,7 @@ var _add_entry = function (req, res) {
                                 switch (changes[i].columnType) {
                                 case "Number":
                                     var val = Number(req.body[columnName]);
-                                    if (value == NaN)
+                                    if (isNaN(val))
                                         throw new Error("Field: " + columnName + " must be a valid number");
                                     extraAttr.attrValue = val;
                                     break;
@@ -57,7 +143,7 @@ var _add_entry = function (req, res) {
                                     break;
                                 case "Date":
                                     var val = Date.parse(req.body[columnName]);
-                                    if (val == NaN)
+                                    if (isNaN(val))
                                         throw new Error("Field: " + columnName + " must be a valid date");
                                     extraAttr.attrValue = val;
                                     break;
@@ -90,51 +176,6 @@ var _add_entry = function (req, res) {
             });
         }
     });
-
-
-
-
-}
-
-var _get_finances = function (req, res) {
-    var combined = {};
-    var combinedArr = new Array();
-
-    if (req.query['tid'] && req.query['ssn']) {
-        var promise = Finance.findOne({
-            ssn: req.query['ssn'],
-            tid: req.query['tid']
-        }).exec();
-
-        promise.then(function (finance) {
-            combined = finance;
-
-            return ExtraAttr.find({
-                ssn: finance.ssn,
-                tid: finance.tid
-            }).exec();
-
-        }).then(function (attrs) {
-            for (var i = 0; i < attrs.length; i++) {
-                var attr = attrs[i];
-                combined._doc[attr.attrName] = attr.attrValue;
-            }
-
-            res.status(200).send(combined);
-        }).then(null, function (err) {
-            res.status(500).send(err);
-        });
-    
-    // this get all is more of a test, this shouldn't really be used
-    } else {
-        Finance.find(function (err, finances) {
-            if (err) {
-                res.send(err);
-                return;
-            }
-            res.send(finances);
-        });
-    }
 }
 
 var _update_finances = function (req, res) {
@@ -265,7 +306,7 @@ var _delete_finances = function (req, res) {
 
 module.exports = {
     add_entry: _add_entry,
-    get_finances: _get_finances,
+    get_finances: _get_full_finance_info,
     update_finances: _update_finances,
     delete_finances: _delete_finances
 }

@@ -70,7 +70,11 @@ app.get('/finances', function (req, res) {
         return;
     }
     
-    FinanceHelper.get_finances(req, res);
+    var prom = FinanceHelper.get_finances(req.query['ssn'], req.query['tid']);
+    prom.then(function(val) {
+        res.status(val.status).send(val.data ? val.data : val.error);
+    });
+    
 });
 
 /* Update this users information*/
