@@ -1,8 +1,8 @@
 {
-    aws:{
-        region: null, 
-        accessID : null,
-        secretKey : null,
-        queueUrl : null
+    "aws":{
+        "region": null, 
+        "accessID" : null,
+        "secretKey" : null,
+        "queueUrl" : null
     }
 }
