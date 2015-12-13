@@ -22,7 +22,6 @@ var _get_schema_changes = function (tid) {
 }
 
 var _get = function (tid) {
-    console.log("getting schema changes");
     return _get_schema_changes(tid)
         .then(function (changes) {
                 return new ResponseHelper(null, 200, changes);

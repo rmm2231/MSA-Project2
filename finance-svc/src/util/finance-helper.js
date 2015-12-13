@@ -25,12 +25,7 @@ function errorResponse(err, code) {
 }
 
 var _get_finances = function (ssn, tid) {
-    var query_opts = !ssn && !tid ? {} : !tid ? {
-        ssn: ssn
-    } : {
-        ssn: ssn,
-        tid: tid
-    };
+    var query_opts = !ssn && !tid ? {} : !tid ? {ssn: ssn} : !ssn ? {tid:tid} : {ssn: ssn, tid: tid};
 
     return Finance.find(query_opts, function (err, finances) {
         if (err)

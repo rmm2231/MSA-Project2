@@ -46,7 +46,7 @@ var _get_tenant = function(tid) {
 }
 
 var _put_tenant = function(entry) {
-    return Tenant.update({tid:entry}, {tName: entry.tid}, {}, function(err, saved) {
+    return Tenant.update({tid:entry.tid}, {tName: entry.tName}, {}, function(err, saved) {
         if (err)
             throw new Error(err);
         return saved;
@@ -58,7 +58,7 @@ var _put_tenant = function(entry) {
 }
 
 var _delete_tenant = function(tid) {
-    return Tenant.remove({tid:entry}, function(err) {
+    return Tenant.remove({tid:tid}, function(err) {
         if (err)
             throw new Error(err);
     }).then(function(){
