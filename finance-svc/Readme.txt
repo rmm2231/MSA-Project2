@@ -74,10 +74,13 @@ SQS API:
     {
         "Method":"POST | GET | PUT | DELETE",
         "Area":"Finance | Tenant | Schema",
-        "Data" {
+        "Data" : {
             /* The data required for the specific api call*/
         }
     }
+    
+    Messages that do not have the three (case-sensitive) properties above will be ignored. Those that do, but contain
+    bad data in them will be removed and a response will be sent (see below).
     
     After processing the message, a response is sent to the Queue in the following format:
     
