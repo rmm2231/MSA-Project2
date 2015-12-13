@@ -2,7 +2,7 @@ var Finance = require('../models/finance.js');
 var SchemaChanges = require('../models/schema-changes.js');
 var ExtraAttr = require('../models/extra-attributes.js');
 
-var HelperResponse = require('../models/response.js');
+var ResponseHelper = require('../models/response.js');
 var SchemaHelper = require('./schema-helper.js');
 
 //==== HELPERS ====\\
@@ -17,11 +17,11 @@ function _reflect(promise) {
 }
 
 function successResponse(data) {
-    return new HelperResponse(null, 200, data);
+    return new ResponseHelper(null, 200, data);
 }
 
 function errorResponse(err, code) {
-    return new HelperResponse(err, code, null);
+    return new ResponseHelper(err, code, null);
 }
 
 var _get_finances = function (ssn, tid) {
@@ -187,9 +187,9 @@ var get_full_finance_info = function (ssn, tid) {
                 combinedArr.push(to_add);
             }
 
-            return new HelperResponse(null, 200, combinedArr);
+            return successResponse(combinedArr);
         }, function (err) {
-            return new HelperResponse(err, 500, null);
+            return errorResponse(err, 500);
         });
     });
 }
@@ -199,7 +199,7 @@ var post_finances = function (entry) {
 
     return exists_promise.then(function (count) {
         if (count > 0) {
-            return new HelperResponse("Entry already exists", 409, null);
+            return errorResponse("Entry already exists",409);
         }
         return _save_finance(entry).then(function (saved) {
             //Get all the additional columns for this tenant
@@ -215,7 +215,7 @@ var post_finances = function (entry) {
 
                     if (changes[i].required && !entry.hasOwnProperty(columnName)) {
                         _roll_back_post(entry.ssn, entry.tid);
-                        return new HelperResponse("Field: " + columnName + " is required.", 400, null);
+                        return new ResponseHelper("Field: " + columnName + " is required.", 400, null);
                     }
                     extraAttr.attrName = columnName;
                     extraAttr.ssn = entry.ssn;
@@ -226,7 +226,7 @@ var post_finances = function (entry) {
                         var val = Number(entry[columnName]);
                         if (isNaN(val)) {
                             _roll_back_post(entry.ssn, entry.tid);
-                            return new HelperResponse("Field: " + columnName + " must be a valid number", 400, null);
+                            return new ResponseHelper("Field: " + columnName + " must be a valid number", 400, null);
                         }
                         extraAttr.attrValue = val;
                         break;
@@ -237,7 +237,7 @@ var post_finances = function (entry) {
                         var val = Date.parse(entry[columnName]);
                         if (isNaN(val)) {
                             _roll_back_post(entry.ssn, entry.tid);
-                            return new HelperResponse("Field: " + columnName + " must be a valid date", 400, null);
+                            return new ResponseHelper("Field: " + columnName + " must be a valid date", 400, null);
                         }
                         extraAttr.attrValue = val;
                         break;
@@ -247,23 +247,23 @@ var post_finances = function (entry) {
                 }
 
                 return Promise.all(save_promises.map(_reflect)).then(function (results) {
-                    return new HelperResponse(null, 200, "Saved entry for SSN: " + entry.ssn + " TID: " + entry.tid);
+                    return successResponse("Saved entry for SSN: " + entry.ssn + " TID: " + entry.tid);
                 }, function (err) {
                     _roll_back_post(entry.ssn, entry.tid);
-                    return new HelperResponse(err, 500, null);
+                    return errorResponse(err, 500);
                 });
 
             }, function (err) {
                 _roll_back_post(entry.ssn, entry.tid);
-                return new HelperResponse(err, 500, null);
+                return errorResponse(err, 500);
             });
         }, function (err) {
             _roll_back_post(entry.ssn, entry.tid);
-            return new HelperResponse(err, 500, null);
+            return errorResponse(err, 500);
         });
     }, function (err) {
         _roll_back_post(entry.ssn, entry.tid);
-        return new HelperResponse(err, 500, null);
+        return errorResponse(err, 500);
     });
 }
 
@@ -338,9 +338,27 @@ var delete_finances = function(ssn, tid) {
     });
 }
 
+var process_message = function(message) {
+    switch(message.Method){
+        case "POST":
+            return post_finances(message.Data);
+        case "PUT":
+            return put_finances(message.Data);
+        case "GET":
+            return get_full_finance_info(message.Data.ssn, message.Data.tid);
+        case "DELETE":
+            return delete_finances(message.Data.ssn, message.Data.tid);
+        default:
+            return new Promise(function(resolve, reject) {
+                resolve(errorResponse("Method not supported", 501));
+            });
+    }
+}
+
 module.exports = {
     post_finances: post_finances,
     get_finances: get_full_finance_info,
     put_finances: put_finances,
-    delete_finances: delete_finances
+    delete_finances: delete_finances,
+    process_message: process_message
 }

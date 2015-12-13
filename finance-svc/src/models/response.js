@@ -1,7 +1,7 @@
 function Response(error, status, data) {
-    this.error = error;
-    this.status = status;
-    this.data = data;
+    this.Error = error;
+    this.Status = status;
+    this.Data = data;
 }
 
 module.exports = Response;

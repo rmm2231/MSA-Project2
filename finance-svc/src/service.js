@@ -40,7 +40,7 @@ app.get('/', function (req, res) {
 
 var process_promise = function(promise, res){
     promise.then(function(val) {
-        res.status(val.status).send(val.data ? val.data : val.error);
+        res.status(val.Status).send(val.Data ? val.Data : val.Error);
     });
 }
 
@@ -159,6 +159,8 @@ app.get('/extra-attr', function (req, res) {
         res.status(200).send(results);
     });
 });
+
+SQSHelper.pollQueue();
 
 var server = app.listen(3000, "0.0.0.0", function () {
     var host = server.address().address;

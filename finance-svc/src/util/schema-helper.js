@@ -51,8 +51,22 @@ var _post = function (entry) {
     });
 }
 
+var process_message = function(message) {
+    switch(message.Method){
+        case "POST":
+            return _post(message.Data);
+        case "GET":
+            return _get(message.Data.tid);
+        default:
+            return new Promise(function(resolve, reject) {
+                resolve(errorResponse("Method not supported", 501));
+            });
+    }
+}
+
 module.exports = {
     get_changes: _get_schema_changes,
     web_get: _get,
-    web_post: _post
+    web_post: _post,
+    process_message: process_message
 }

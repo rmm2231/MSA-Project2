@@ -68,9 +68,27 @@ var _delete_tenant = function(tid) {
     });
 }
 
+var _process_message = function(message) {
+    switch(message.Method){
+        case "POST":
+            return _post_tenant(message.Data);
+        case "PUT":
+            return _put_tenant(message.Data);
+        case "GET":
+            return _get_tenant(message.Data.tid);
+        case "DELETE":
+            return _delete_tenant(message.Data.tid);
+        default:
+            return new Promise(function(resolve, reject) {
+                resolve(errorResponse("Method not supported", 501));
+            });
+    }
+}
+
 module.exports = {
     post_tenant: _post_tenant,
     get_tenant: _get_tenant,
     put_tenant: _put_tenant,
-    delete_tenant: _delete_tenant
+    delete_tenant: _delete_tenant,
+    process_message: _process_message
 };
