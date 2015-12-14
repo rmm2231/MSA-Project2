@@ -123,7 +123,7 @@ function pollQueueForMessages() {
                 }
                 
                 return process_response.then(function (data) {
-                        data['originalMessage'] = message_data;
+                        data['OriginalMessage'] = message_data;
                         console.log("Sending response message");
                         return (
                             sendMessage({
@@ -186,7 +186,7 @@ function handleWorkFlowError(error) {
         break;
     case "ProcessingError":
         console.log("Processing Error:", error.message);
-        response['originalMessage'] = error.old_data;
+        response['OriginalMessage'] = error.old_data;
             
         sendMessage({MessageBody: JSON.stringify(response)})
         .then(function(data){
