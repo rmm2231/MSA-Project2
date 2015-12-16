@@ -25,7 +25,7 @@ var sqsReq = new aws.SQS({
     secretAccessKey: config.aws.requestQueue.secretKey,
 
     params: {
-        QueueUrl: config.aws.responseQueue.queueUrl
+        QueueUrl: config.aws.requestQueue.queueUrl
     }
 });
 
@@ -53,9 +53,6 @@ function pollQueueForMessages() {
         .then(
             function handleMessageResolve(data) {
 
-                // If there are no message, throw an error so that we can bypass the
-                // subsequent resolution handler that is expecting to have a message
-                // delete confirmation.
                 if (!data.Messages) {
 
                     throw (
@@ -66,7 +63,7 @@ function pollQueueForMessages() {
                     );
 
                 }
-
+                
                 var filtered_messages = data.Messages.filter(function (x) {
                     var json_body = JSON.parse(x.Body);
                     //we should delete the messages that don't have this field here and send a response to the queue
