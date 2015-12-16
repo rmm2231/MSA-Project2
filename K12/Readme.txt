@@ -6,19 +6,16 @@ API:
         
 STUDENT API:
     GET /student:
-        Without query parameters it returns all the students in the system. It does not require a parameter, but if you provide any, the query will be built upon that.
+        Without query parameters it returns all the students in the system. It does not require a parameter, but if you provide any in the URL, the query will be built upon that.
 
-    POST /student:
-        Add a new student entry. SSN is required. Below are the fields and descriptions:
-            ssn: {type: String, required: true},
-            firstName: String,
-            lastName: String
+    POST /student/{ssn}:
+        Add a new student entry. SSN is required. Other fields should be included in the request body.
 
-    DELETE /student:
-        SSN is required. Allows you to delete one student entry.
+    DELETE /student/{ssn}:
+        SSN is required. Allows you to delete one student entry. No other attributes needed.
 
-    PUT /student:
-        Updates a student’s information. SSN is required and unchangable.
+    PUT /student/{ssn}:
+        Updates a student’s information. SSN is required and unchangeable. Include other fields in the JSON body.
 
 SQS API:
     All of the above API's can be accessed through SQS as well.

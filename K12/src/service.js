@@ -23,16 +23,25 @@ app.get('/', function(req, res) {
 });
 
 // CRUD API
-app.put('/student', function (req, res) {
+app.post('/student/:ssn', function (req, res) {
+	// Call Dynamo to write to DB
+});
+
+app.get('/student/:ssn', function (req, res) {
+	if (req.query == null) {
+	}
+	// Call Dynamo
+});
+
+app.put('/student/:ssn', function (req, res) {
 	if (req.body == null) {
 		res.status(400).send('Request body is empty!');
 		return;
 	}
-	if (req.body.ssn == null) {
-		res.status(400).send("SSN is required");
-		return;
-	}
-	
+	// Call Dynamo to write to DB
+});
+
+app.delete('/student/:ssn', function (req, res) {
 	// Call Dynamo to write to DB
 });
 
