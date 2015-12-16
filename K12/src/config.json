@@ -1,0 +1,18 @@
+{
+    "aws":{
+			"responseQueue" : {
+				"region": null, 
+        "accessID" : null,
+        "secretKey" : null,
+        "queueUrl" : null
+        },
+        "requestQueue" : {
+            "region": null, 
+            "accessID" : null,
+            "secretKey" : null,
+            "queueUrl" : null
+        }
+        
+    }
+	
+}

@@ -1,0 +1,20 @@
+{
+  "name": "src",
+  "version": "1.0.0",
+  "description": "Simulated K-12 microservice",
+  "main": "service.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jingyuan Sun js4768@columbia.edu",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.14.1",
+    "express": "^4.13.3",
+    "util": "^0.10.3",
+    "xml2js": "^0.4.13",
+    "aws-sdk": "^2.2.22",
+    "q":"^1.4.1",
+    "chalk":"^1.1.1"
+  }
+}
