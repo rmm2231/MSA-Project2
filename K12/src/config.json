@@ -1,18 +1,21 @@
 {
     "aws":{
-			"responseQueue" : {
-				"region": null, 
-        "accessID" : null,
-        "secretKey" : null,
-        "queueUrl" : null
+				"responseQueue" : {
+					"region": null, 
+					"accessID" : null,
+					"secretKey" : null,
+					"queueUrl" : null
         },
         "requestQueue" : {
             "region": null, 
             "accessID" : null,
             "secretKey" : null,
             "queueUrl" : null
-        }
-        
+        },
+        "dynamoDB" : {
+						"region": null, 
+            "accessID" : null,
+            "secretKey" : null
+				}
     }
-	
 }

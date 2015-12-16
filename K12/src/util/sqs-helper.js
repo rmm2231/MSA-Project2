@@ -38,7 +38,7 @@ var receiveRequestMessage = Q.nbind(sqsReq.receiveMessage, sqsReq);
 var deleteRequestMessage = Q.nbind(sqsReq.deleteMessage, sqsReq);
 
 var supportedMethods = ['POST', 'GET', 'PUT', 'DELETE'];
-var supportedAreas = ['Finance', 'Tenant', 'Schema'];
+var supportedAreas = ['Student'];
 
 function pollQueueForMessages() {
 
