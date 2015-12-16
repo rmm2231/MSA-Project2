@@ -9,19 +9,33 @@ var TenantHelper = require('./tenant-helper.js');
 var SchemaHelper = require('./schema-helper.js');
 var ResponseHelper = require('../models/response.js');
 
-var sqs = new aws.SQS({
-    region: config.aws.region,
-    accessKeyId: config.aws.accessID,
-    secretAccessKey: config.aws.secretKey,
+var sqsRes = new aws.SQS({
+    region: config.aws.responseQueue.region,
+    accessKeyId: config.aws.responseQueue.accessID,
+    secretAccessKey: config.aws.responseQueue.secretKey,
 
     params: {
-        QueueUrl: config.aws.queueUrl
+        QueueUrl: config.aws.responseQueue.queueUrl
     }
 });
 
-var sendMessage = Q.nbind(sqs.sendMessage, sqs);
-var receiveMessage = Q.nbind(sqs.receiveMessage, sqs);
-var deleteMessage = Q.nbind(sqs.deleteMessage, sqs);
+var sqsReq = new aws.SQS({
+    region: config.aws.requestQueue.region,
+    accessKeyId: config.aws.requestQueue.accessID,
+    secretAccessKey: config.aws.requestQueue.secretKey,
+
+    params: {
+        QueueUrl: config.aws.responseQueue.queueUrl
+    }
+});
+
+var sendResponseMessage = Q.nbind(sqsRes.sendMessage, sqsRes);
+var receiveResponseMessage = Q.nbind(sqsRes.receiveMessage, sqsRes);
+var deleteResponseMessage = Q.nbind(sqsRes.deleteMessage, sqsRes);
+
+var sendRequestMessage = Q.nbind(sqsReq.sendMessage, sqsReq);
+var receiveRequestMessage = Q.nbind(sqsReq.receiveMessage, sqsReq);
+var deleteRequestMessage = Q.nbind(sqsReq.deleteMessage, sqsReq);
 
 var supportedMethods = ['POST', 'GET', 'PUT', 'DELETE'];
 var supportedAreas = ['Finance', 'Tenant', 'Schema'];
@@ -30,9 +44,7 @@ function pollQueueForMessages() {
 
     console.log("Starting long-poll operation.");
 
-    // Pull a message - we're going to keep the long-polling timeout short so as to
-    // keep the demo a little bit more interesting.
-    receiveMessage({
+    receiveRequestMessage({
             WaitTimeSeconds: 3, // Enable long-polling (3-seconds).
             VisibilityTimeout: 10,
             MaxNumberOfMessages: 5,
@@ -57,7 +69,19 @@ function pollQueueForMessages() {
 
                 var filtered_messages = data.Messages.filter(function (x) {
                     var json_body = JSON.parse(x.Body);
-                    return json_body.hasOwnProperty("Method") && json_body.hasOwnProperty("Area") && json_body.hasOwnProperty("Data");
+                    //we should delete the messages that don't have this field here and send a response to the queue
+                    if (json_body.hasOwnProperty("Method") && json_body.hasOwnProperty("Area") && json_body.hasOwnProperty("Data"))
+                        return true;
+                    
+                    sendResponseAndDeleteRequest(
+                        workflowError(
+                            "Bad Request",
+                            new Error("Bad request message"),
+                            json_body,
+                            new ResponseHelper("Bad request message", 400, null)
+                        )
+                    );
+                    return false;
                 });
                 var sorted_messages = filtered_messages.sort(function (a, b) {
                     return a.Attributes.SentTimestamp - b.Attributes.SentTimestamp;
@@ -126,7 +150,7 @@ function pollQueueForMessages() {
                         data['OriginalMessage'] = message_data;
                         console.log("Sending response message");
                         return (
-                            sendMessage({
+                            sendResponseMessage({
                                 MessageBody: JSON.stringify(data)
                             })
                         );
@@ -142,7 +166,7 @@ function pollQueueForMessages() {
                         console.log("Response sent");
                         console.log("Deleting:", message_to_process.MessageId);
                         return (
-                            deleteMessage({
+                            deleteRequestMessage({
                                 ReceiptHandle: message_to_process.ReceiptHandle
                             })
                         );
@@ -176,6 +200,23 @@ function workflowError(type, error, old_data, response) {
     return (error);
 }
 
+function sendResponseAndDeleteRequest(error) {
+    error.response['OriginalMessage'] = error.old_data;
+
+    sendResponseMessage({MessageBody: JSON.stringify(error.response)})
+    .then(function(data){
+        console.log("Sent response message");
+        return deleteRequestMessage({ReceiptHandle: error.old_data.ReceiptHandle});
+    }, function(err){
+        console.log("Error sending message:", err);   
+    })
+    .then(function(data){
+        console.log("Deleted message"); 
+    }, function(err) {
+        console.log("Error deleting message:", err);   
+    });
+}
+
 function handleWorkFlowError(error) {
     switch (error.type) {
     case "EmptyQueue":
@@ -183,21 +224,11 @@ function handleWorkFlowError(error) {
         break;
     case "UnsupportedOp":
         console.log("Unsupported Op:", error.message);
+        sendResponseAndDeleteRequest(error);
         break;
     case "ProcessingError":
         console.log("Processing Error:", error.message);
-        response['OriginalMessage'] = error.old_data;
-            
-        sendMessage({MessageBody: JSON.stringify(response)})
-        .then(function(data){
-            console.log("Sent response message");
-            return deleteMessage({ReceiptHandle: old_data.ReceiptHandle});
-        }, function(err){
-            console.log("Error sending message:", err);   
-        })
-        .then(function(data){
-            console.log("Deleted message"); 
-        });
+        sendResponseAndDeleteRequest(error);
         break;
     default:
         console.log("Unexpected Error:", error.message);
