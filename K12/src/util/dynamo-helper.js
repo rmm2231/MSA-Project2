@@ -50,7 +50,7 @@ var postStudent = function(p_key, entry) {
 		params.Item[p] = entry[p];
 	}
 	// Connect to Dynamo
-	dynamodbDoc.put(params, function(err, data) {
+	var dynamolog = dynamodbDoc.put(params, function(err, data) {
 		if (err) {
 			console.error("Unable to add student", p_key, ". Error JSON:", JSON.stringify(err, null, 2));
 			// Help: need to return error response to postStudent
@@ -61,6 +61,7 @@ var postStudent = function(p_key, entry) {
 			//successResponse("Saved student with SSN: " + p_key);
 		}
 	});
+	console.log(dynamolog);
 }
 
 var deleteStudent = function(p_key) {
