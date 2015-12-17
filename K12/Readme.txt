@@ -5,8 +5,8 @@ API:
         Returns an info string about the service
         
 STUDENT API:
-    GET /student:
-        Without query parameters it returns all the students in the system. It does not require a parameter, but if you provide any in the URL, the query will be built upon that.
+    GET /student/{ssn}:
+        SSN is required to get info of a student. DynamoDB is fully key-partitioned and we cannot apply additional parameters.
 
     POST /student/{ssn}:
         Add a new student entry. SSN is required. Other fields should be included in the request body.

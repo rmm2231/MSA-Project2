@@ -52,14 +52,12 @@ function pollQueueForMessages() {
             function handleMessageResolve(data) {
 
                 if (!data.Messages) {
-
                     throw (
                         workflowError(
                             "EmptyQueue",
                             new Error("There are no messages to process.")
                         )
                     );
-
                 }
                 
                 var filtered_messages = data.Messages.filter(function (x) {
@@ -135,6 +133,7 @@ function pollQueueForMessages() {
                     );
                 }
                 return process_response.then(function (data) {
+									var data = {};
                         data['OriginalMessage'] = message_data;
                         console.log("Sending response message");
                         return (

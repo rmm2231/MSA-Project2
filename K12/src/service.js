@@ -4,6 +4,8 @@ var config = require('./config.json');
 var aws = require("aws-sdk");
 var Q = require("q");
 var app = express();
+app.use(bodyParser.json());         
+app.use(bodyParser.urlencoded({ extended: true }));    
 
 // Util Helpers
 var SQSHelper = require('./util/sqs-helper.js');
@@ -31,11 +33,12 @@ app.post('/student/:ssn', function (req, res) {
 	process_promise(dynamoHelper.postStudent(req.params.ssn, req.body), res);
 });
 
-app.get('/student', function (req, res) {
-	if (req.query == null) {
+app.get('/student/:ssn', function (req, res) {
+	if(req.params == null || req.params.ssn == null) {
+		res.status(400).send("SSN required")
 	}
 	// Call Dynamo
-	process_promise(dynamoHelper.getStudent(req.query), res);
+	process_promise(dynamoHelper.getStudent(req.params.ssn, req.query), res);
 });
 
 app.put('/student/:ssn', function (req, res) {

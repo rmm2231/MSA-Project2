@@ -4,6 +4,13 @@ var aws = require("aws-sdk");
 var Q = require("q");
 var ResponseHelper = require('../models/response.js');
 
+var credentials = {
+    accessKeyId: config.aws.dynamoDB.accessKeyId, 
+    secretAccessKey: config.aws.dynamoDB.secretAccessKey,
+    region: config.aws.dynamoDB.region
+};
+var dynasty = require('dynasty')(credentials);
+var students = dynasty.table('Students');
 aws.config.update({
     accessKeyId: config.aws.dynamoDB.accessKeyId, 
     secretAccessKey: config.aws.dynamoDB.secretAccessKey,
@@ -30,63 +37,50 @@ var describeTable = function (tableName) {
 	return tableInfo;
 }
 
-var getStudent = function(entry) {
-	// entry is a JSON object containing the query params
-	// Connect to Dynamo
+var getStudent = function(p_key, entry) {
+	return students.find(p_key).then(function (val) {
+		if(val == null) return errorResponse("Cannot find student "+p_key, 500);
+		return successResponse(val);
+	});
 }
 
 var putStudent = function(p_key, entry) {
-	// Connect to Dynamo
+	return students.find(p_key).then(function (val) {
+		if(val == null) return errorResponse("Student "+p_key+" does not exist", 500);
+		var params = {};
+		for(var p in entry) {
+			if(p != 'ssn')
+				params[p] = entry[p];
+		}
+		return students.update(p_key, params).then(function (val) {
+			if(val == null) return errorResponse("Cannot update student "+p_key, 500);
+			return successResponse("Successfully updated student: "+p_key);
+		});
+	});
 }
 
-/* 
- * This function will return a promise containing the response data (alternatively you can just 
- * return the response object without wrapping it in a promise and alter the SQS helper to not
- * wait for a promise to return). 
- *
- * I don't think the below will work because I think the dynamodbDoc.* functions are asynchronous.
- * take a look at http://dynastyjs.com/ for one that you can use with promises. Basically,
- * you would do a var promise = dynasty.insert(<object>).then(function(resp) {return new ResponseHelper object based on the resp});
- * or you can just do return dynasty.insert(<object>).then(function(resp) {return new ResponseHelper object based on the resp});
- */
 var postStudent = function(p_key, entry) {
-	var response; //TODO: copy over the response.js file into your models folder
-	
-	var params = {
-		TableName: "Students",
-		Item: {
+	return students.find(p_key).then(function (val) {
+		if(val != null) return errorResponse("Student "+p_key+" already exists", 500);
+		var params = {};
+		params.ssn = p_key;
+		for(var p in entry) {
+			params[p] = entry[p];
 		}
-	};
-	params.ssn = p_key;
-	for(var p in entry) {
-		params.Item[p] = entry[p];
-	}
-	// Connect to Dynamo
-	var dynamolog = dynamodbDoc.put(params, function(err, data) {
-		if (err) {
-			console.error("Unable to add student", p_key, ". Error JSON:", JSON.stringify(err, null, 2));
-			/*
-			 * You do not need to talk to SQS here. The response stuff is only sent to the SQS queue if you
-			 * are processing an SQS request. This function will return for you a promise containing the 
-			 * the response data of the execution of the post
-			 */
-			response = errorResponse(err, 500);
-		} else {
-			console.log("PutItem succeeded:", p_key);
-			// See note above
-			response = successResponse("Saved student with SSN: " + p_key);
-		}
-	});
-	console.log(dynamolog);
-	
-	return new Promise(function(resolve, reject) {
-		resolve(response);
+		return students.insert(params).then(function (val) {
+			if(val == null) return errorResponse("Cannot add new student "+p_key, 500);
+			return successResponse("Successfully add new student: "+p_key);
+		});
 	});
 }
 
 var deleteStudent = function(p_key) {
-	var query_opts = {ssn: p_key};
-	// Connect to Dynamo
+	return students.find(p_key).then(function (val) {
+		if(val == null) return errorResponse("Cannot find student "+p_key+" to delete", 500);
+		return students.remove(p_key).then(function (val) {
+			return successResponse("Successfully deleted student "+p_key);
+		});
+	});
 }
 
 var processMessage = function(message) {
@@ -96,7 +90,7 @@ var processMessage = function(message) {
 		case "PUT":
 			return putStudent(message.Data.ssn, message.Data);
 		case "GET":
-			return getStudent(message.Data);
+			return getStudent(message.Data.ssn, message.Data);
 		case "DELETE":
 			return deleteStudent(message.Data.ssn);
 		default:
