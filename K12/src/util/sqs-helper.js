@@ -4,9 +4,7 @@ var config = require('../config.json');
 
 var aws = require("aws-sdk");
 var Q = require("q");
-var FinanceHelper = require('./finance-helper.js');
-var TenantHelper = require('./tenant-helper.js');
-var SchemaHelper = require('./schema-helper.js');
+var dynamoHelper = require('./dynamo-helper.js')
 var ResponseHelper = require('../models/response.js');
 
 var sqsRes = new aws.SQS({
@@ -113,14 +111,8 @@ function pollQueueForMessages() {
                 var process_response;
                 try{
                     switch (message_data.Area) {
-                    case "Finance":
-                        process_response = FinanceHelper.process_message(message_data);
-                        break;
-                    case "Tenant":
-                        process_response = TenantHelper.process_message(message_data);
-                        break;
-                    case "Schema":
-                        process_response = SchemaHelper.process_message(message_data);
+                    case "Student":
+                        process_response = dynamoHelper.processMessage(message_data);
                         break;
                     default:
                         throw (
@@ -142,7 +134,6 @@ function pollQueueForMessages() {
                         )
                     );
                 }
-                
                 return process_response.then(function (data) {
                         data['OriginalMessage'] = message_data;
                         console.log("Sending response message");
@@ -158,8 +149,7 @@ function pollQueueForMessages() {
                                 new Error(err.message ? err.message : err)
                             )
                         );
-                    })
-                    .then(function (data) {
+                    }).then(function (data) {
                         console.log("Response sent");
                         console.log("Deleting:", message_to_process.MessageId);
                         return (
