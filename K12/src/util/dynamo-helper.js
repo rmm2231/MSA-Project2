@@ -39,7 +39,19 @@ var putStudent = function(p_key, entry) {
 	// Connect to Dynamo
 }
 
+/* 
+ * This function will return a promise containing the response data (alternatively you can just 
+ * return the response object without wrapping it in a promise and alter the SQS helper to not
+ * wait for a promise to return). 
+ *
+ * I don't think the below will work because I think the dynamodbDoc.* functions are asynchronous.
+ * take a look at http://dynastyjs.com/ for one that you can use with promises. Basically,
+ * you would do a var promise = dynasty.insert(<object>).then(function(resp) {return new ResponseHelper object based on the resp});
+ * or you can just do return dynasty.insert(<object>).then(function(resp) {return new ResponseHelper object based on the resp});
+ */
 var postStudent = function(p_key, entry) {
+	var response; //TODO: copy over the response.js file into your models folder
+	
 	var params = {
 		TableName: "Students",
 		Item: {
@@ -53,15 +65,23 @@ var postStudent = function(p_key, entry) {
 	var dynamolog = dynamodbDoc.put(params, function(err, data) {
 		if (err) {
 			console.error("Unable to add student", p_key, ". Error JSON:", JSON.stringify(err, null, 2));
-			// Help: need to return error response to postStudent
-			//errorResponse(err, 500);
+			/*
+			 * You do not need to talk to SQS here. The response stuff is only sent to the SQS queue if you
+			 * are processing an SQS request. This function will return for you a promise containing the 
+			 * the response data of the execution of the post
+			 */
+			response = errorResponse(err, 500);
 		} else {
 			console.log("PutItem succeeded:", p_key);
-			// Help: need to return error response to postStudent
-			//successResponse("Saved student with SSN: " + p_key);
+			// See note above
+			response = successResponse("Saved student with SSN: " + p_key);
 		}
 	});
 	console.log(dynamolog);
+	
+	return new Promise(function(resolve, reject) {
+		resolve(response);
+	});
 }
 
 var deleteStudent = function(p_key) {
