@@ -125,7 +125,7 @@ function pollQueueForMessages() {
                 } catch(error) {
                     throw (
                         workflowError(
-                            "ProccessingError",
+                            "ProcessingError",
                             new Error(error),
                             message_data,
                             new ResponseHelper("Error processing message", 400, null)
@@ -192,6 +192,7 @@ function sendResponseAndDeleteRequest(error) {
     sendResponseMessage({MessageBody: JSON.stringify(error.response)})
     .then(function(data){
         console.log("Sent response message");
+			console.log(error);
         return deleteRequestMessage({ReceiptHandle: error.old_data.ReceiptHandle});
     }, function(err){
         console.log("Error sending message:", err);   
