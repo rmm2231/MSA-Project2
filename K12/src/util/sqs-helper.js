@@ -97,7 +97,7 @@ function pollQueueForMessages() {
                         workflowError(
                             "UnsupportedOp",
                             new Error("There are no supported operations for method: " + message_data.Method),
-                            message_data,
+                            message_to_process,
                             new ResponseHelper("There are no supported operations for method: " + message_data.Method, 501, null)
                         )
                     );
@@ -117,7 +117,7 @@ function pollQueueForMessages() {
                             workflowError(
                                 "UnsupportedOp",
                                 new Error("There are no supported operations for area: " + message_data.Area),
-                                message_data,
+                                message_to_process,
                                 new ResponseHelper("There are no supported operations for area: " + message_data.Area, 501, null)
                             )
                         );
@@ -127,13 +127,12 @@ function pollQueueForMessages() {
                         workflowError(
                             "ProcessingError",
                             new Error(error),
-                            message_data,
+                            message_to_process,
                             new ResponseHelper("Error processing message", 400, null)
                         )
                     );
                 }
                 return process_response.then(function (data) {
-									var data = {};
                         data['OriginalMessage'] = message_data;
                         console.log("Sending response message");
                         return (
@@ -192,7 +191,6 @@ function sendResponseAndDeleteRequest(error) {
     sendResponseMessage({MessageBody: JSON.stringify(error.response)})
     .then(function(data){
         console.log("Sent response message");
-			console.log(error);
         return deleteRequestMessage({ReceiptHandle: error.old_data.ReceiptHandle});
     }, function(err){
         console.log("Error sending message:", err);   

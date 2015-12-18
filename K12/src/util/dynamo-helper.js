@@ -40,6 +40,7 @@ var describeTable = function (tableName) {
 var getStudent = function(p_key, entry) {
 	return students.find(p_key).then(function (val) {
 		if(val == null) return errorResponse("Cannot find student "+p_key, 500);
+		console.log(val);
 		return successResponse(val);
 	});
 }
