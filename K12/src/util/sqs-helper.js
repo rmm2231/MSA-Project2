@@ -133,7 +133,7 @@ function pollQueueForMessages() {
                     );
                 }
                 return process_response.then(function (data) {
-                        data['OriginalMessage'] = message_data;
+                        data['OriginalMessage'] = message_to_process;
                         console.log("Sending response message");
                         return (
                             sendResponseMessage({

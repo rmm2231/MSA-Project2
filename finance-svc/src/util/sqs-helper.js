@@ -127,7 +127,7 @@ function pollQueueForMessages() {
                             workflowError(
                                 "UnsupportedOp",
                                 new Error("There are no supported operations for area: " + message_data.Area),
-                                message_data,
+                                message_to_process,
                                 new ResponseHelper("There are no supported operations for area: " + message_data.Area, 501, null)
                             )
                         );
@@ -135,9 +135,9 @@ function pollQueueForMessages() {
                 } catch(error) {
                     throw (
                         workflowError(
-                            "ProccessingError",
+                            "ProcessingError",
                             new Error(error),
-                            message_data,
+                            message_to_process,
                             new ResponseHelper("Error processing message", 400, null)
                         )
                     );
