@@ -46,7 +46,7 @@ var process_promise = function(promise, res){
 
 var verify_tenant = function(tid) {
     return TenantHelper.get_tenant(tid).then(function(tenant){
-        return tenant.data.length != 0;
+        return tenant.Data.length != 0;
     });
 }
 
