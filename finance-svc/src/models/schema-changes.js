@@ -15,7 +15,7 @@ var SchemaChangesSchema = new Schema({
         required:true,
         validate: {
             validator: function(v) {
-                return v === "String" || v === "Number" || v === "Date";
+                return v == "String" || v == "Number" || v == "Date";
             },
             message: '{VALUE} is not a supported type. Supported types are "String", "Number", "Date"'
         }

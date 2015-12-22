@@ -15,8 +15,9 @@ var ExtraAttr = require('./models/extra-attributes.js');
 var SchemaChanges = require('./models/schema-changes.js');
 var Tenant = require('./models/tenant.js');
 
+var mongodb_ip = 'mongodb://0.0.0.0:27017';
 // Docker Environment
-var mongodb_ip = 'mongodb://' + process.env.MONGO_PORT_27017_TCP_ADDR + ':' + process.env.MONGO_PORT_27017_TCP_PORT;
+//var mongodb_ip = 'mongodb://' + process.env.MONGO_PORT_27017_TCP_ADDR + ':' + process.env.MONGO_PORT_27017_TCP_PORT;
 
 var connectWithRetry = function () {
     return mongoose.connect(mongodb_ip, function (err) {
