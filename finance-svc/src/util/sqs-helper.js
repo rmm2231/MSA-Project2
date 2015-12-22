@@ -101,7 +101,7 @@ function pollQueueForMessages() {
                         workflowError(
                             "UnsupportedOp",
                             new Error("There are no supported operations for method: " + message_data.Method),
-                            message_data,
+                            message_to_process,
                             new ResponseHelper("There are no supported operations for method: " + message_data.Method, 501, null)
                         )
                     );
@@ -144,7 +144,7 @@ function pollQueueForMessages() {
                 }
                 
                 return process_response.then(function (data) {
-                        data['OriginalMessage'] = message_data;
+                        data['OriginalMessage'] = message_to_process;
                         console.log("Sending response message");
                         return (
                             sendResponseMessage({
